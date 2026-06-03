@@ -182,6 +182,14 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--sans);height:
 .goal-edit-wrap input:focus{border-color:var(--accent)}
 .goal-save-btn{padding:7px 14px;background:var(--accent);color:#0a0a0f;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}
 
+/* Edit modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;display:flex;align-items:flex-end;justify-content:center}
+.modal{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-height:85dvh;overflow-y:auto;padding:20px 16px calc(var(--safe-bottom)+20px)}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.modal-title{font-size:17px;font-weight:600}
+.modal-close{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:2px 6px}
+.edit-btn{background:none;border:none;color:var(--accent);padding:3px 6px;cursor:pointer;font-size:13px;flex-shrink:0;margin-top:1px}
+
 select option{background:#1c1c26}
 input[type=range]{accent-color:var(--accent)}
 </style>
@@ -217,8 +225,6 @@ input[type=range]{accent-color:var(--accent)}
         </div>
       </div>
       <div class="chart-card"><div class="chart-card-title">뱅크롤 추이</div><div class="chart-wrap"><canvas id="chart" role="img" aria-label="뱅크롤 변화 그래프">뱅크롤 추이</canvas></div></div>
-      <div class="sec">스테이크 추천</div>
-      <div class="stake-grid" id="stakeGrid"></div>
     </div>
 
     <!-- ADD SESSION -->
@@ -259,7 +265,28 @@ input[type=range]{accent-color:var(--accent)}
       </div>
       <div class="field-row">
         <div class="field"><label>오늘 가져간 돈 ($)</label><input type="number" id="fBuyin" placeholder="예: 500" step="50" min="0"></div>
-        <div class="field"><label>스테이크 / 바이인</label><input type="text" id="fStake" placeholder="NL200, $100 MTT"></div>
+        <div class="field"><label>스테이크 / 바이인</label>
+          <select id="fStakeSelect" onchange="onStakeSelect()">
+            <option value="">선택...</option>
+            <optgroup id="stakeOptGroup" label="캐시 게임">
+              <option value="$2/$5">$2/$5</option>
+              <option value="$5/$5">$5/$5</option>
+              <option value="$5/$5/$10">$5/$5/$10</option>
+              <option value="$5/$10">$5/$10</option>
+              <option value="$10/$10">$10/$10</option>
+            </optgroup>
+            <optgroup label="토너먼트">
+              <option value="$100 MTT">$100 MTT</option>
+              <option value="$200 MTT">$200 MTT</option>
+              <option value="$300 MTT">$300 MTT</option>
+            </optgroup>
+            <option value="__custom__">직접 입력...</option>
+          </select>
+        </div>
+      </div>
+      <div id="fStakeCustomWrap" style="display:none" class="field">
+        <label>스테이크 직접 입력</label>
+        <input type="text" id="fStake" placeholder="예: $3/$5, $500 MTT">
       </div>
       <div class="field">
         <label>장소</label>
@@ -328,6 +355,81 @@ input[type=range]{accent-color:var(--accent)}
   </div>
 </div>
 
+<!-- EDIT MODAL -->
+<div id="editModal" class="modal-overlay" style="display:none" onclick="closeEditModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">세션 수정</div>
+      <button class="modal-close" onclick="closeEditModal()">×</button>
+    </div>
+    <div class="field">
+      <label>게임 타입</label>
+      <div class="type-toggle">
+        <button class="type-btn active cash" id="eBtnCash" onclick="selectEditType('cash')">♠ 캐시 게임</button>
+        <button class="type-btn tourney" id="eBtnTourney" onclick="selectEditType('tourney')">🏆 토너먼트</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>수익 / 손실 ($)</label>
+      <input type="number" id="ePnl" class="pnl-input" oninput="colorPnl(this)">
+    </div>
+    <div class="field-row">
+      <div class="field"><label>날짜</label><input type="date" id="eDate"></div>
+      <div class="field"><label>플레이 시간 (h)</label><input type="number" id="eHours" step="0.25" min="0"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>오늘 가져간 돈 ($)</label><input type="number" id="eBuyin" step="50" min="0"></div>
+      <div class="field"><label>스테이크</label><input type="text" id="eStake" placeholder="$5/$5"></div>
+    </div>
+    <div class="field">
+      <label>장소</label>
+      <select id="eLocation">
+        <option value="">장소 선택</option>
+        <option value="The Gardens">The Gardens</option>
+        <option value="The Commerce">The Commerce</option>
+        <option value="기타">기타</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>컨디션 / 멘탈</label>
+      <div class="mood-row" id="eMoodRow">
+        <button class="mood-btn" data-mood="5" onclick="selectEditMood(5)">😄</button>
+        <button class="mood-btn" data-mood="4" onclick="selectEditMood(4)">🙂</button>
+        <button class="mood-btn" data-mood="3" onclick="selectEditMood(3)">😐</button>
+        <button class="mood-btn" data-mood="2" onclick="selectEditMood(2)">😔</button>
+        <button class="mood-btn" data-mood="1" onclick="selectEditMood(1)">😩</button>
+      </div>
+    </div>
+    <div class="field"><label>메모</label><input type="text" id="eMemo" placeholder="메모"></div>
+    <button class="submit-btn" onclick="saveEdit()">저장하기</button>
+  </div>
+</div>
+
+<!-- EDIT HAND MODAL -->
+<div id="editHandModal" class="modal-overlay" style="display:none" onclick="closeEditHandModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">핸드 노트 수정</div>
+      <button class="modal-close" onclick="closeEditHandModal()">×</button>
+    </div>
+    <div class="field"><label>핸드 제목</label><input type="text" id="ehTitle" placeholder="예: AK vs 리레이즈"></div>
+    <div class="field"><label>내용</label><textarea id="ehBody" placeholder="상황, 내 액션, 배운 점..." style="resize:none;min-height:100px;width:100%;background:var(--surface);border:0.5px solid var(--border2);border-radius:10px;padding:11px 13px;color:var(--text);font-family:var(--sans);font-size:14px;outline:none"></textarea></div>
+    <div class="field-row">
+      <div class="field"><label>태그</label>
+        <select id="ehTag">
+          <option value="bluff">블러프</option>
+          <option value="value">밸류</option>
+          <option value="fold">폴드 스팟</option>
+          <option value="bad">나쁜 플레이</option>
+          <option value="good">좋은 플레이</option>
+        </select>
+      </div>
+      <div class="field"><label>날짜</label><input type="date" id="ehDate"></div>
+    </div>
+    <button class="submit-btn" onclick="saveEditHand()">저장하기</button>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 const INITIAL=6000,STOP_TOTAL=.20,STOP_SESS=.05;
@@ -366,6 +468,17 @@ function switchTab(page){
   if(page==='tools')renderTools();
 }
 
+function onStakeSelect(){
+  const v=document.getElementById('fStakeSelect').value;
+  document.getElementById('fStakeCustomWrap').style.display=v==='__custom__'?'block':'none';
+  if(v!=='__custom__'&&v)document.getElementById('fStake').value='';
+}
+function getSelectedStake(){
+  const v=document.getElementById('fStakeSelect').value;
+  if(v==='__custom__')return document.getElementById('fStake').value;
+  return v;
+}
+
 function selectType(t){
   selectedType=t;
   document.getElementById('btnCash').classList.toggle('active',t==='cash');
@@ -373,6 +486,17 @@ function selectType(t){
   document.getElementById('btnTourney').classList.toggle('active',t==='tourney');
   document.getElementById('btnTourney').classList.toggle('tourney',t==='tourney');
   document.getElementById('rebuySection').style.display=t==='tourney'?'block':'none';
+  // Swap stake optgroup label
+  const og=document.getElementById('stakeOptGroup');
+  if(t==='cash'){
+    og.label='캐시 게임';
+    og.innerHTML=`<option value="$2/$5">$2/$5</option><option value="$5/$5">$5/$5</option><option value="$5/$5/$10">$5/$5/$10</option><option value="$5/$10">$5/$10</option><option value="$10/$10">$10/$10</option>`;
+  } else {
+    og.label='토너먼트';
+    og.innerHTML=`<option value="$100 MTT">$100 MTT</option><option value="$200 MTT">$200 MTT</option><option value="$300 MTT">$300 MTT</option>`;
+  }
+  document.getElementById('fStakeSelect').value='';
+  document.getElementById('fStakeCustomWrap').style.display='none';
 }
 function selectMood(m){
   selectedMood=m;
@@ -449,7 +573,7 @@ function addSession(){
     startTime:document.getElementById('fStartTime').value,
     endTime:document.getElementById('fEndTime').value,
     type:selectedType,
-    stake:document.getElementById('fStake').value,
+    stake:getSelectedStake(),
     pnl:pnlRaw,
     buyin:parseFloat(document.getElementById('fBuyin').value)||0,
     rebuyCount:parseInt(document.getElementById('fRebuy').value)||0,
@@ -463,6 +587,8 @@ function addSession(){
   });
   save();
   ['fPnl','fHours','fMemo','fStake','fRebuy','fRebuyAmt','fReentry','fReentryAmt','fBuyin','fStartTime','fEndTime'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  document.getElementById('fStakeSelect').value='';
+  document.getElementById('fStakeCustomWrap').style.display='none';
   document.getElementById('fPnl').className='pnl-input';
   document.getElementById('fLocation').value='';
   document.getElementById('fLocationOtherWrap').style.display='none';
@@ -556,10 +682,6 @@ function renderHome(){
   sessions.forEach((s,i)=>{labels.push(s.date?s.date.slice(5):'#'+(i+1));data.push(bankrollAt(i))});
   if(chartInst){chartInst.destroy();chartInst=null}
   chartInst=new Chart(document.getElementById('chart'),{type:'line',data:{labels,datasets:[{data,borderColor:'#63b3ed',backgroundColor:'rgba(99,179,237,0.08)',fill:true,tension:.4,pointRadius:data.length>12?2:4,pointBackgroundColor:'#63b3ed',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' $'+c.parsed.y.toLocaleString()}}},scales:{x:{ticks:{color:'#6b6b80',font:{size:10},maxRotation:0,maxTicksLimit:6},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#6b6b80',font:{size:10},callback:v=>'$'+v.toLocaleString()},grid:{color:'rgba(255,255,255,0.05)'}}}}});
-  // Stakes
-  const stakes=[{name:'NL25 / $25',desc:'뱅크롤 $0+',min:0,max:1250},{name:'NL50 / $50',desc:'뱅크롤 $1,250+',min:1250,max:2500},{name:'NL100 / $100',desc:'뱅크롤 $2,500+',min:2500,max:5000},{name:'NL200 / $200',desc:'뱅크롤 $5,000+',min:5000,max:10000}];
-  const sg=document.getElementById('stakeGrid');sg.innerHTML='';
-  stakes.forEach(s=>{const active=br>=s.min&&br<s.max;sg.innerHTML+=`<div class="stake-card ${active?'active':''}">${active?'<div class="stake-badge">현재 레벨</div>':''}<div class="stake-name">${s.name}</div><div class="stake-desc">${s.desc}</div></div>`});
 }
 
 // ── HISTORY ──
@@ -584,6 +706,7 @@ function renderHistory(){
         <div class="session-pnl ${s.pnl>=0?'pos':'neg'}">${s.pnl>=0?'+':''}$${Math.abs(s.pnl).toLocaleString()}</div>
         <div class="session-br">$${br.toLocaleString()}</div>
       </div>
+      <button class="edit-btn" onclick="openEditModal(${i})">✏️</button>
       <button class="del-btn" onclick="deleteSession(${i})">×</button>
     </div>`;
   });
@@ -716,7 +839,7 @@ function renderHandsTab(){
   const tagColors={bluff:'var(--red)',value:'var(--green)',fold:'var(--amber)',bad:'var(--red)',good:'var(--teal)'};
   html+=hands.slice().reverse().map((h,ri)=>{
     const i=hands.length-1-ri;
-    return`<div class="hand-item"><div class="hand-header"><div><span class="hand-tag" style="background:${tagColors[h.tag]||'var(--accent)'};color:#0a0a0f">${h.tag}</span><span class="hand-title">${h.title}</span></div><div style="display:flex;align-items:center;gap:8px"><span class="hand-meta">${h.date||''}</span><button onclick="deleteHand(${i})" style="background:none;border:none;color:var(--faint);cursor:pointer;font-size:14px">×</button></div></div><div class="hand-body">${h.body}</div></div>`
+    return`<div class="hand-item"><div class="hand-header"><div><span class="hand-tag" style="background:${tagColors[h.tag]||'var(--accent)'};color:#0a0a0f">${h.tag}</span><span class="hand-title">${h.title}</span></div><div style="display:flex;align-items:center;gap:8px"><span class="hand-meta">${h.date||''}</span><button onclick="openEditHand(${i})" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px">✏️</button><button onclick="deleteHand(${i})" style="background:none;border:none;color:var(--faint);cursor:pointer;font-size:14px">×</button></div></div><div class="hand-body">${h.body}</div></div>`
   }).join('');
   document.getElementById('toolsHands').innerHTML=html;
   document.getElementById('hDate').value=new Date().toISOString().slice(0,10);
@@ -729,6 +852,41 @@ function saveHand(){
   save();renderHandsTab();
 }
 function deleteHand(i){hands.splice(i,1);save();renderHandsTab()}
+
+// ── EDIT HAND ──
+let editHandIdx=null;
+function openEditHand(i){
+  editHandIdx=i;
+  const h=hands[i];
+  document.getElementById('ehTitle').value=h.title||'';
+  document.getElementById('ehBody').value=h.body||'';
+  document.getElementById('ehTag').value=h.tag||'bluff';
+  document.getElementById('ehDate').value=h.date||'';
+  document.getElementById('editHandModal').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+function closeEditHandModal(e){
+  if(e&&e.target!==document.getElementById('editHandModal'))return;
+  document.getElementById('editHandModal').style.display='none';
+  document.body.style.overflow='';
+  editHandIdx=null;
+}
+function saveEditHand(){
+  if(editHandIdx===null)return;
+  const title=document.getElementById('ehTitle').value.trim();
+  if(!title){alert('제목을 입력해줘!');return}
+  hands[editHandIdx]={
+    title,
+    body:document.getElementById('ehBody').value.trim(),
+    tag:document.getElementById('ehTag').value,
+    date:document.getElementById('ehDate').value,
+  };
+  save();
+  document.getElementById('editHandModal').style.display='none';
+  document.body.style.overflow='';
+  editHandIdx=null;
+  renderHandsTab();
+}
 
 function renderVarianceTab(){
   const pnl=currentBankroll()-INITIAL;
@@ -796,6 +954,66 @@ function exportJSON(){
 function importJSON(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();r.onload=function(ev){try{const d=JSON.parse(ev.target.result);if(d.sessions){sessions=d.sessions;if(d.hands)hands=d.hands;save();alert('불러오기 완료! 세션 '+sessions.length+'개');renderHome();}else alert('올바른 백업 파일이 아닌 것 같아.')}catch(err){alert('파일 읽기 오류: '+err.message)}};r.readAsText(f);
+}
+
+// ── EDIT SESSION ──
+let editIdx=null,editMood=3;
+function openEditModal(i){
+  editIdx=i;
+  const s=sessions[i];
+  editMood=s.mood||3;
+  selectEditType(s.type||'cash');
+  document.getElementById('ePnl').value=s.pnl;
+  colorPnl(document.getElementById('ePnl'));
+  document.getElementById('eDate').value=s.date||'';
+  document.getElementById('eHours').value=s.hours||'';
+  document.getElementById('eBuyin').value=s.buyin||'';
+  document.getElementById('eStake').value=s.stake||'';
+  document.getElementById('eLocation').value=s.location||'';
+  document.getElementById('eMemo').value=s.memo||'';
+  document.querySelectorAll('#eMoodRow .mood-btn').forEach(b=>b.classList.toggle('active',+b.dataset.mood===editMood));
+  document.getElementById('editModal').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+function closeEditModal(e){
+  if(e&&e.target!==document.getElementById('editModal'))return;
+  document.getElementById('editModal').style.display='none';
+  document.body.style.overflow='';
+  editIdx=null;
+}
+function selectEditType(t){
+  document.getElementById('eBtnCash').classList.toggle('active',t==='cash');
+  document.getElementById('eBtnCash').classList.toggle('cash',t==='cash');
+  document.getElementById('eBtnTourney').classList.toggle('active',t==='tourney');
+  document.getElementById('eBtnTourney').classList.toggle('tourney',t==='tourney');
+}
+function selectEditMood(m){
+  editMood=m;
+  document.querySelectorAll('#eMoodRow .mood-btn').forEach(b=>b.classList.toggle('active',+b.dataset.mood===m));
+}
+function saveEdit(){
+  if(editIdx===null)return;
+  const pnl=parseFloat(document.getElementById('ePnl').value);
+  if(isNaN(pnl)){alert('수익/손실을 입력해줘!');return}
+  const type=document.getElementById('eBtnCash').classList.contains('active')?'cash':'tourney';
+  sessions[editIdx]={
+    ...sessions[editIdx],
+    pnl,
+    type,
+    date:document.getElementById('eDate').value,
+    hours:parseFloat(document.getElementById('eHours').value)||0,
+    buyin:parseFloat(document.getElementById('eBuyin').value)||0,
+    stake:document.getElementById('eStake').value,
+    location:document.getElementById('eLocation').value,
+    mood:editMood,
+    memo:document.getElementById('eMemo').value,
+  };
+  save();
+  document.getElementById('editModal').style.display='none';
+  document.body.style.overflow='';
+  editIdx=null;
+  renderHistory();
+  renderHome();
 }
 
 // Init
