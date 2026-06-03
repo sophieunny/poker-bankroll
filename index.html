@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="포커 뱅크롤">
+<meta name="theme-color" content="#0a0a0f">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>기정이의 포커 뱅크롤</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Pretendard:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0f;--surface:#13131a;--surface2:#1c1c26;--surface3:#22222f;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#f0f0f5;--muted:#6b6b80;--faint:#3a3a4a;
+  --accent:#63b3ed;--accent-dim:rgba(99,179,237,0.13);
+  --green:#68d391;--green-dim:rgba(104,211,145,0.13);
+  --red:#fc8181;--red-dim:rgba(252,129,129,0.13);
+  --amber:#f6ad55;--amber-dim:rgba(246,173,85,0.13);
+  --purple:#b794f4;--purple-dim:rgba(183,148,244,0.13);
+  --teal:#4fd1c5;--teal-dim:rgba(79,209,197,0.13);
+  --mono:'DM Mono',monospace;--sans:'Pretendard',-apple-system,sans-serif;
+  --safe-top:env(safe-area-inset-top,44px);--safe-bottom:env(safe-area-inset-bottom,20px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg);color:var(--text);font-family:var(--sans);height:100%;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100dvh}
+#statusBar{height:var(--safe-top);background:var(--bg);flex-shrink:0}
+#tabBar{display:flex;border-bottom:0.5px solid var(--border);background:var(--bg);flex-shrink:0;padding:0 2px}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px 6px;cursor:pointer;border:none;background:none;color:var(--muted);font-family:var(--sans);font-size:9.5px;font-weight:500;transition:color .15s}
+.tab .ti{font-size:20px}
+.tab.active{color:var(--accent)}
+#pages{flex:1;overflow:hidden;position:relative}
+.page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;display:none;padding:0 15px calc(var(--safe-bottom) + 16px)}
+.page.active{display:block}
+.page-header{padding:18px 0 14px;border-bottom:0.5px solid var(--border);margin-bottom:18px}
+.page-header h1{font-size:21px;font-weight:600;letter-spacing:-.5px}
+.page-header p{font-size:12px;color:var(--muted);margin-top:3px}
+
+/* Hero */
+.hero{background:var(--surface);border:0.5px solid var(--border2);border-radius:20px;padding:22px 18px 18px;margin-bottom:14px;text-align:center}
+.hero-label{font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;font-family:var(--mono);margin-bottom:6px}
+.hero-amount{font-family:var(--mono);font-size:38px;font-weight:500;letter-spacing:-1px}
+.hero-amount.pos{color:var(--green)}.hero-amount.neg{color:var(--red)}.hero-amount.neutral{color:var(--text)}
+.hero-pnl{font-family:var(--mono);font-size:13px;margin-top:5px}
+.hero-divider{width:100%;height:0.5px;background:var(--border);margin:14px 0}
+.hero-stats{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0}
+.hero-stat{text-align:center}
+.hero-stat:not(:last-child){border-right:0.5px solid var(--border)}
+.hero-stat-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono)}
+.hero-stat-value{font-size:15px;font-weight:500;font-family:var(--mono);margin-top:2px}
+
+/* Alert */
+.alert{border-radius:12px;padding:11px 13px;margin-bottom:14px;display:flex;align-items:flex-start;gap:9px;font-size:13px;line-height:1.5}
+.alert.danger{background:var(--red-dim);border:0.5px solid var(--red);color:var(--red)}
+.alert.warning{background:var(--amber-dim);border:0.5px solid var(--amber);color:var(--amber)}
+
+/* Chart card */
+.chart-card{background:var(--surface);border:0.5px solid var(--border);border-radius:16px;padding:14px;margin-bottom:14px}
+.chart-card-title{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono);margin-bottom:10px}
+.chart-wrap{position:relative;width:100%;height:150px}
+
+/* Section label */
+.sec{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono);margin-bottom:9px}
+
+/* Stake grid */
+.stake-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:18px}
+.stake-card{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:11px 13px}
+.stake-card.active{border-color:var(--accent);background:var(--accent-dim)}
+.stake-name{font-size:12px;font-weight:500;font-family:var(--mono)}
+.stake-card.active .stake-name{color:var(--accent)}
+.stake-desc{font-size:11px;color:var(--muted);margin-top:2px}
+.stake-badge{display:inline-block;font-size:10px;background:var(--accent);color:#0a0a0f;padding:2px 6px;border-radius:5px;font-weight:600;margin-bottom:3px}
+
+/* Live timer */
+.live-banner{background:var(--green-dim);border:0.5px solid var(--green);border-radius:14px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.live-timer{font-family:var(--mono);font-size:22px;font-weight:500;color:var(--green)}
+.live-label{font-size:11px;color:var(--green);opacity:.8}
+.live-stop{background:var(--red);color:#0a0a0f;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer}
+
+/* Form */
+.field{margin-bottom:11px}
+.field label{font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;background:var(--surface);border:0.5px solid var(--border2);border-radius:10px;padding:11px 13px;color:var(--text);font-family:var(--sans);font-size:15px;outline:none;appearance:none;-webkit-appearance:none}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent)}
+.field textarea{resize:none;font-size:14px;min-height:70px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.field-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+.pnl-input{font-family:var(--mono);font-size:18px!important;text-align:center}
+.pnl-input.pos{color:var(--green)}.pnl-input.neg{color:var(--red)}
+.type-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.type-btn{padding:11px;border-radius:10px;border:0.5px solid var(--border2);background:var(--surface);color:var(--muted);font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;text-align:center}
+.type-btn.active.cash{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
+.type-btn.active.tourney{border-color:var(--purple);background:var(--purple-dim);color:var(--purple)}
+.submit-btn{width:100%;padding:15px;background:var(--accent);color:#0a0a0f;border:none;border-radius:13px;font-size:15px;font-weight:600;font-family:var(--sans);cursor:pointer;margin-top:4px;-webkit-appearance:none;transition:opacity .15s}
+.submit-btn:active{opacity:.8}
+.start-session-btn{width:100%;padding:15px;background:var(--green);color:#0a0a0f;border:none;border-radius:13px;font-size:15px;font-weight:600;font-family:var(--sans);cursor:pointer;margin-top:4px;-webkit-appearance:none}
+
+/* Session list */
+.session-item{background:var(--surface);border:0.5px solid var(--border);border-radius:13px;padding:13px 14px;margin-bottom:9px;display:flex;align-items:flex-start;gap:11px}
+.session-dot{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.session-dot.cash{background:var(--accent-dim)}
+.session-dot.tourney{background:var(--purple-dim)}
+.session-info{flex:1;min-width:0}
+.session-stake{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.session-meta{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.session-pnl{font-family:var(--mono);font-size:15px;font-weight:500;text-align:right;flex-shrink:0}
+.session-pnl.pos{color:var(--green)}.session-pnl.neg{color:var(--red)}
+.session-br{font-size:10px;color:var(--muted);font-family:var(--mono);text-align:right;margin-top:2px}
+.del-btn{background:none;border:none;color:var(--faint);padding:3px 5px;cursor:pointer;font-size:15px;flex-shrink:0;margin-top:1px}
+.empty{text-align:center;padding:44px 20px;color:var(--muted);font-size:14px}
+.empty-icon{font-size:38px;margin-bottom:10px}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:18px}
+.stat-card{background:var(--surface);border:0.5px solid var(--border);border-radius:13px;padding:14px}
+.stat-card-label{font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.stat-card-value{font-size:20px;font-weight:500;font-family:var(--mono)}
+.stat-card-value.pos{color:var(--green)}.stat-card-value.neg{color:var(--red)}
+.stat-card-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.streak-bar{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;margin-bottom:18px}
+.streak-dot{width:20px;height:20px;border-radius:5px}
+.streak-dot.w{background:var(--green-dim);border:0.5px solid var(--green)}
+.streak-dot.l{background:var(--red-dim);border:0.5px solid var(--red)}
+
+/* Location cards */
+.loc-grid{display:grid;grid-template-columns:1fr;gap:9px;margin-bottom:18px}
+.loc-card{background:var(--surface);border:0.5px solid var(--border);border-radius:13px;padding:14px 16px}
+.loc-name{font-size:14px;font-weight:500;margin-bottom:8px}
+.loc-stats{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0}
+.loc-stat{text-align:center}
+.loc-stat:not(:last-child){border-right:0.5px solid var(--border)}
+.loc-stat-label{font-size:9px;color:var(--muted);font-family:var(--mono);text-transform:uppercase}
+.loc-stat-value{font-size:14px;font-weight:500;font-family:var(--mono);margin-top:2px}
+
+/* Day/hour heatmap */
+.heatmap-row{display:flex;align-items:center;gap:4px;margin-bottom:5px}
+.heatmap-label{font-size:10px;color:var(--muted);font-family:var(--mono);width:26px;text-align:right;flex-shrink:0}
+.heatmap-cell{flex:1;height:22px;border-radius:4px;background:var(--surface2);position:relative}
+
+/* Mood selector */
+.mood-row{display:flex;gap:8px}
+.mood-btn{flex:1;padding:10px 4px;border-radius:10px;border:0.5px solid var(--border2);background:var(--surface);font-size:18px;cursor:pointer;text-align:center;transition:all .15s}
+.mood-btn.active{border-color:var(--accent);background:var(--accent-dim)}
+
+/* Hand notes */
+.hand-item{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:9px}
+.hand-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.hand-title{font-size:13px;font-weight:500}
+.hand-meta{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.hand-body{font-size:13px;color:var(--text);line-height:1.55}
+.hand-tag{display:inline-block;font-size:10px;padding:2px 7px;border-radius:5px;font-weight:500;margin-right:4px}
+
+/* Variance */
+.var-result{background:var(--surface);border:0.5px solid var(--border);border-radius:13px;padding:14px;margin-top:12px}
+.var-stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--border)}
+.var-stat-row:last-child{border-bottom:none}
+.var-stat-label{font-size:13px;color:var(--muted)}
+.var-stat-value{font-size:13px;font-weight:500;font-family:var(--mono)}
+
+/* Segment control */
+.seg{display:flex;background:var(--surface2);border-radius:10px;padding:3px;gap:2px;margin-bottom:14px}
+.seg-btn{flex:1;padding:7px;border:none;background:none;color:var(--muted);font-family:var(--sans);font-size:12px;font-weight:500;border-radius:7px;cursor:pointer;transition:all .15s}
+.seg-btn.active{background:var(--surface3);color:var(--text)}
+
+select option{background:#1c1c26}
+input[type=range]{accent-color:var(--accent)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="statusBar"></div>
+  <div id="tabBar">
+    <button class="tab active" data-page="home" onclick="switchTab('home')"><i class="ti ti-home"></i>홈</button>
+    <button class="tab" data-page="add" onclick="switchTab('add')"><i class="ti ti-plus"></i>기록</button>
+    <button class="tab" data-page="history" onclick="switchTab('history')"><i class="ti ti-list"></i>히스토리</button>
+    <button class="tab" data-page="stats" onclick="switchTab('stats')"><i class="ti ti-chart-bar"></i>통계</button>
+    <button class="tab" data-page="tools" onclick="switchTab('tools')"><i class="ti ti-tool"></i>도구</button>
+  </div>
+  <div id="pages">
+
+    <!-- HOME -->
+    <div class="page active" id="page-home">
+      <div class="page-header"><h1>기정이의 뱅크롤</h1><p id="homeDate"></p></div>
+      <div id="liveArea"></div>
+      <div id="alertArea"></div>
+      <div class="hero">
+        <div class="hero-label">현재 뱅크롤</div>
+        <div class="hero-amount neutral" id="heroBankroll">$6,000</div>
+        <div class="hero-pnl" id="heroPnl" style="color:var(--muted)">시작 $6,000</div>
+        <div class="hero-divider"></div>
+        <div class="hero-stats">
+          <div class="hero-stat"><div class="hero-stat-label">세션</div><div class="hero-stat-value" id="heroSessions">0</div></div>
+          <div class="hero-stat"><div class="hero-stat-label">시간당</div><div class="hero-stat-value" id="heroHourly" style="color:var(--muted)">$0</div></div>
+          <div class="hero-stat"><div class="hero-stat-label">승률</div><div class="hero-stat-value" id="heroWinRate" style="color:var(--muted)">—</div></div>
+          <div class="hero-stat"><div class="hero-stat-label">ROI</div><div class="hero-stat-value" id="heroROI" style="color:var(--muted)">0%</div></div>
+        </div>
+      </div>
+      <div class="chart-card"><div class="chart-card-title">뱅크롤 추이</div><div class="chart-wrap"><canvas id="chart" role="img" aria-label="뱅크롤 변화 그래프">뱅크롤 추이</canvas></div></div>
+      <div class="sec">스테이크 추천</div>
+      <div class="stake-grid" id="stakeGrid"></div>
+    </div>
+
+    <!-- ADD SESSION -->
+    <div class="page" id="page-add">
+      <div class="page-header"><h1>세션 기록</h1><p>오늘 어땠어?</p></div>
+      <div class="field">
+        <label>게임 타입</label>
+        <div class="type-toggle">
+          <button class="type-btn active cash" id="btnCash" onclick="selectType('cash')">♠ 캐시 게임</button>
+          <button class="type-btn tourney" id="btnTourney" onclick="selectType('tourney')">🏆 토너먼트</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>수익 / 손실 ($)</label>
+        <input type="number" id="fPnl" class="pnl-input" placeholder="+250 또는 -100" oninput="colorPnl(this)">
+      </div>
+      <!-- Rebuy section (tourney only) -->
+      <div id="rebuySection" style="display:none">
+        <div class="field-row">
+          <div class="field"><label>리바이 횟수</label><input type="number" id="fRebuy" placeholder="0" min="0" step="1"></div>
+          <div class="field"><label>리바이 금액 ($)</label><input type="number" id="fRebuyAmt" placeholder="0"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>리엔트리 횟수</label><input type="number" id="fReentry" placeholder="0" min="0" step="1"></div>
+          <div class="field"><label>리엔트리 금액 ($)</label><input type="number" id="fReentryAmt" placeholder="0"></div>
+        </div>
+        <div id="trueCostBox" style="background:var(--surface2);border-radius:10px;padding:10px 12px;margin-bottom:11px;font-size:12px;color:var(--muted);display:none">
+          실제 투자금: <span id="trueCost" style="color:var(--amber);font-family:var(--mono);font-weight:500"></span> | 실수익: <span id="trueProfit" style="font-family:var(--mono);font-weight:500"></span>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>날짜</label><input type="date" id="fDate"></div>
+        <div class="field"><label>시작 시간</label><input type="time" id="fStartTime"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>플레이 시간 (h)</label><input type="number" id="fHours" placeholder="4.5" step="0.5" min="0"></div>
+        <div class="field"><label>스테이크 / 바이인</label><input type="text" id="fStake" placeholder="NL200, $100 MTT"></div>
+      </div>
+      <div class="field">
+        <label>장소</label>
+        <select id="fLocation">
+          <option value="">장소 선택 (선택사항)</option>
+          <option value="The Garden">The Garden</option>
+          <option value="The Commerce">The Commerce</option>
+          <option value="기타">기타</option>
+        </select>
+      </div>
+      <div id="fLocationOtherWrap" style="display:none" class="field">
+        <label>장소 직접 입력</label>
+        <input type="text" id="fLocationOther" placeholder="장소명">
+      </div>
+      <!-- Mental/condition -->
+      <div class="field">
+        <label>컨디션 / 멘탈</label>
+        <div class="mood-row">
+          <button class="mood-btn active" data-mood="5" onclick="selectMood(5)" title="최고">😄</button>
+          <button class="mood-btn" data-mood="4" onclick="selectMood(4)" title="좋음">🙂</button>
+          <button class="mood-btn" data-mood="3" onclick="selectMood(3)" title="보통">😐</button>
+          <button class="mood-btn" data-mood="2" onclick="selectMood(2)" title="나쁨">😔</button>
+          <button class="mood-btn" data-mood="1" onclick="selectMood(1)" title="최악">😩</button>
+        </div>
+      </div>
+      <div class="field"><label>수면 시간</label><input type="number" id="fSleep" placeholder="8" step="0.5" min="0" max="24"></div>
+      <div class="field"><label>세션 메모</label><input type="text" id="fMemo" placeholder="테이블 컨디션, 특이사항"></div>
+      <button class="submit-btn" onclick="addSession()">세션 저장하기</button>
+      <div style="height:10px"></div>
+      <button class="start-session-btn" onclick="startLiveSession()">⏱ 라이브 타이머 시작</button>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="page" id="page-history">
+      <div class="page-header"><h1>세션 히스토리</h1><p id="historySubtitle">기록 없음</p></div>
+      <div id="sessionList"><div class="empty"><div class="empty-icon">♣</div>아직 기록된 세션이 없어.<br>첫 세션을 추가해봐!</div></div>
+    </div>
+
+    <!-- STATS -->
+    <div class="page" id="page-stats">
+      <div class="page-header"><h1>통계</h1><p id="statsSubtitle">전체 세션 분석</p></div>
+      <div class="seg" id="statsSeg">
+        <button class="seg-btn active" onclick="selectStatTab('overview')">전체</button>
+        <button class="seg-btn" onclick="selectStatTab('location')">장소별</button>
+        <button class="seg-btn" onclick="selectStatTab('time')">시간대별</button>
+        <button class="seg-btn" onclick="selectStatTab('mental')">멘탈</button>
+      </div>
+      <div id="statsOverview"></div>
+      <div id="statsLocation" style="display:none"></div>
+      <div id="statsTime" style="display:none"></div>
+      <div id="statsMental" style="display:none"></div>
+    </div>
+
+    <!-- TOOLS -->
+    <div class="page" id="page-tools">
+      <div class="page-header"><h1>도구</h1><p>핸드 메모 · 분산 · 내보내기</p></div>
+      <div class="seg" id="toolsSeg">
+        <button class="seg-btn active" onclick="selectToolTab('hands')">핸드 메모</button>
+        <button class="seg-btn" onclick="selectToolTab('variance')">분산 시뮬</button>
+        <button class="seg-btn" onclick="selectToolTab('export')">내보내기</button>
+      </div>
+      <div id="toolsHands"></div>
+      <div id="toolsVariance" style="display:none"></div>
+      <div id="toolsExport" style="display:none"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const INITIAL=6000,STOP_TOTAL=.20,STOP_SESS=.05;
+let sessions=JSON.parse(localStorage.getItem('gj_poker')||'[]');
+let hands=JSON.parse(localStorage.getItem('gj_hands')||'[]');
+let selectedType='cash',selectedMood=5;
+let chartInst=null,liveStart=null,liveTick=null;
+let activeStatTab='overview',activeToolTab='hands';
+
+function save(){localStorage.setItem('gj_poker',JSON.stringify(sessions));localStorage.setItem('gj_hands',JSON.stringify(hands))}
+function bankrollAt(idx){let b=INITIAL;for(let i=0;i<=idx;i++)b+=sessions[i].pnl;return b}
+function currentBankroll(){return sessions.reduce((a,s)=>a+s.pnl,INITIAL)}
+function fmt(n){return(n>=0?'+$':'-$')+Math.abs(n).toLocaleString()}
+function fmtAbs(n){return'$'+Math.abs(n).toLocaleString()}
+
+function switchTab(page){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.page===page));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+page));
+  if(page==='home')renderHome();
+  if(page==='history')renderHistory();
+  if(page==='stats')renderStats();
+  if(page==='tools')renderTools();
+}
+
+function selectType(t){
+  selectedType=t;
+  document.getElementById('btnCash').classList.toggle('active',t==='cash');
+  document.getElementById('btnCash').classList.toggle('cash',t==='cash');
+  document.getElementById('btnTourney').classList.toggle('active',t==='tourney');
+  document.getElementById('btnTourney').classList.toggle('tourney',t==='tourney');
+  document.getElementById('rebuySection').style.display=t==='tourney'?'block':'none';
+}
+function selectMood(m){
+  selectedMood=m;
+  document.querySelectorAll('.mood-btn').forEach(b=>b.classList.toggle('active',+b.dataset.mood===m));
+}
+function colorPnl(el){const v=parseFloat(el.value);el.className='pnl-input'+(v>0?' pos':v<0?' neg':'')}
+
+document.getElementById('fLocation').addEventListener('change',function(){
+  document.getElementById('fLocationOtherWrap').style.display=this.value==='기타'?'block':'none';
+});
+['fPnl','fRebuy','fRebuyAmt','fReentry','fReentryAmt'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener('input',updateTrueCost);
+});
+function updateTrueCost(){
+  const pnl=parseFloat(document.getElementById('fPnl').value)||0;
+  const ra=parseFloat(document.getElementById('fRebuyAmt').value)||0;
+  const rea=parseFloat(document.getElementById('fReentryAmt').value)||0;
+  const total=ra+rea;
+  if(total>0||pnl!==0){
+    const trueP=pnl-total;
+    document.getElementById('trueCost').textContent=fmtAbs(total);
+    const tp=document.getElementById('trueProfit');
+    tp.textContent=fmt(trueP);
+    tp.style.color=trueP>=0?'var(--green)':'var(--red)';
+    document.getElementById('trueCostBox').style.display='block';
+  } else {
+    document.getElementById('trueCostBox').style.display='none';
+  }
+}
+
+// Live timer
+function startLiveSession(){
+  liveStart=Date.now();
+  localStorage.setItem('gj_live',liveStart);
+  document.getElementById('fStartTime').value=new Date().toTimeString().slice(0,5);
+  switchTab('home');
+  startLiveTick();
+}
+function startLiveTick(){
+  if(liveTick)clearInterval(liveTick);
+  liveTick=setInterval(renderLiveBanner,1000);
+  renderLiveBanner();
+}
+function stopLiveSession(){
+  if(!liveStart)return;
+  const elapsed=(Date.now()-liveStart)/3600000;
+  liveStart=null;
+  localStorage.removeItem('gj_live');
+  clearInterval(liveTick);liveTick=null;
+  document.getElementById('fHours').value=Math.round(elapsed*4)/4;
+  document.getElementById('liveArea').innerHTML='';
+  switchTab('add');
+}
+function renderLiveBanner(){
+  if(!liveStart){document.getElementById('liveArea').innerHTML='';return}
+  const elapsed=Math.floor((Date.now()-liveStart)/1000);
+  const h=Math.floor(elapsed/3600),m=Math.floor((elapsed%3600)/60),s=elapsed%60;
+  const t=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  document.getElementById('liveArea').innerHTML=`<div class="live-banner"><div><div class="live-label">라이브 세션 진행중</div><div class="live-timer">${t}</div></div><button class="live-stop" onclick="stopLiveSession()">세션 종료</button></div>`;
+}
+
+function addSession(){
+  const pnlRaw=parseFloat(document.getElementById('fPnl').value);
+  if(isNaN(pnlRaw)){alert('수익/손실을 입력해줘!');return}
+  let loc=document.getElementById('fLocation').value;
+  if(loc==='기타')loc=document.getElementById('fLocationOther').value||'기타';
+  const ra=parseFloat(document.getElementById('fRebuyAmt').value)||0;
+  const rea=parseFloat(document.getElementById('fReentryAmt').value)||0;
+  sessions.push({
+    date:document.getElementById('fDate').value||new Date().toISOString().slice(0,10),
+    startTime:document.getElementById('fStartTime').value,
+    type:selectedType,
+    stake:document.getElementById('fStake').value,
+    pnl:pnlRaw,
+    rebuyCount:parseInt(document.getElementById('fRebuy').value)||0,
+    rebuyAmt:ra,
+    reentryCount:parseInt(document.getElementById('fReentry').value)||0,
+    reentryAmt:rea,
+    hours:parseFloat(document.getElementById('fHours').value)||0,
+    location:loc,
+    mood:selectedMood,
+    sleep:parseFloat(document.getElementById('fSleep').value)||0,
+    memo:document.getElementById('fMemo').value,
+  });
+  save();
+  ['fPnl','fHours','fMemo','fStake','fRebuy','fRebuyAmt','fReentry','fReentryAmt','fSleep'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  document.getElementById('fPnl').className='pnl-input';
+  document.getElementById('fLocation').value='';
+  document.getElementById('fLocationOtherWrap').style.display='none';
+  document.getElementById('trueCostBox').style.display='none';
+  document.getElementById('rebuySection').style.display='none';
+  selectType('cash');selectMood(5);
+  switchTab('home');
+}
+
+function deleteSession(i){if(!confirm('이 세션을 삭제할까?'))return;sessions.splice(i,1);save();renderHistory();renderHome()}
+
+// ── HOME ──
+function renderHome(){
+  const br=currentBankroll(),pnl=br-INITIAL;
+  const wins=sessions.filter(s=>s.pnl>0).length;
+  const totalH=sessions.reduce((a,s)=>a+(s.hours||0),0);
+  const roi=((pnl/INITIAL)*100).toFixed(1);
+  const heroEl=document.getElementById('heroBankroll');
+  heroEl.textContent='$'+br.toLocaleString();
+  heroEl.className='hero-amount '+(pnl>0?'pos':pnl<0?'neg':'neutral');
+  const pnlEl=document.getElementById('heroPnl');
+  if(pnl===0){pnlEl.textContent='시작 $'+INITIAL.toLocaleString();pnlEl.style.color='var(--muted)'}
+  else{pnlEl.textContent=fmt(pnl)+' ('+( pnl>=0?'+':'')+((pnl/INITIAL)*100).toFixed(1)+'%)';pnlEl.style.color=pnl>=0?'var(--green)':'var(--red)'}
+  document.getElementById('heroSessions').textContent=sessions.length;
+  const hrEl=document.getElementById('heroHourly');
+  if(totalH>0){const hr=Math.round(pnl/totalH);hrEl.textContent=(hr>=0?'+':'−')+'$'+Math.abs(hr);hrEl.style.color=hr>=0?'var(--green)':'var(--red)'}
+  const wrEl=document.getElementById('heroWinRate');
+  if(sessions.length>0){const wr=Math.round(wins/sessions.length*100);wrEl.textContent=wr+'%';wrEl.style.color=wr>=50?'var(--green)':'var(--red)'}
+  const roiEl=document.getElementById('heroROI');
+  roiEl.textContent=(pnl>=0?'+':'')+roi+'%';roiEl.style.color=pnl>=0?'var(--green)':'var(--red)';
+  document.getElementById('homeDate').textContent=new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+  const alertArea=document.getElementById('alertArea');alertArea.innerHTML='';
+  if(pnl<=-(INITIAL*STOP_TOTAL)){alertArea.innerHTML=`<div class="alert danger">⚠ <span><strong>스탑로스 도달!</strong> 총 손실 ${fmtAbs(pnl)} (${Math.round(Math.abs(pnl)/INITIAL*100)}%). 오늘은 여기서 멈춰.</span></div>`}
+  else if(sessions.length>0){const last=sessions[sessions.length-1];if(last.pnl<-(br*STOP_SESS))alertArea.innerHTML=`<div class="alert warning">⚡ <span>마지막 세션에서 뱅크롤의 ${Math.abs(Math.round(last.pnl/br*100))}% 손실. 잠깐 쉬어도 좋아.</span></div>`}
+  if(!liveStart){const saved=localStorage.getItem('gj_live');if(saved){liveStart=+saved;startLiveTick()}}
+  renderLiveBanner();
+  // Chart
+  const labels=['시작'],data=[INITIAL];
+  sessions.forEach((s,i)=>{labels.push(s.date?s.date.slice(5):'#'+(i+1));data.push(bankrollAt(i))});
+  if(chartInst){chartInst.destroy();chartInst=null}
+  chartInst=new Chart(document.getElementById('chart'),{type:'line',data:{labels,datasets:[{data,borderColor:'#63b3ed',backgroundColor:'rgba(99,179,237,0.08)',fill:true,tension:.4,pointRadius:data.length>12?2:4,pointBackgroundColor:'#63b3ed',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' $'+c.parsed.y.toLocaleString()}}},scales:{x:{ticks:{color:'#6b6b80',font:{size:10},maxRotation:0,maxTicksLimit:6},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#6b6b80',font:{size:10},callback:v=>'$'+v.toLocaleString()},grid:{color:'rgba(255,255,255,0.05)'}}}}});
+  // Stakes
+  const stakes=[{name:'NL25 / $25',desc:'뱅크롤 $0+',min:0,max:1250},{name:'NL50 / $50',desc:'뱅크롤 $1,250+',min:1250,max:2500},{name:'NL100 / $100',desc:'뱅크롤 $2,500+',min:2500,max:5000},{name:'NL200 / $200',desc:'뱅크롤 $5,000+',min:5000,max:10000}];
+  const sg=document.getElementById('stakeGrid');sg.innerHTML='';
+  stakes.forEach(s=>{const active=br>=s.min&&br<s.max;sg.innerHTML+=`<div class="stake-card ${active?'active':''}">${active?'<div class="stake-badge">현재 레벨</div>':''}<div class="stake-name">${s.name}</div><div class="stake-desc">${s.desc}</div></div>`});
+}
+
+// ── HISTORY ──
+function renderHistory(){
+  const list=document.getElementById('sessionList');
+  document.getElementById('historySubtitle').textContent=sessions.length?'총 '+sessions.length+'세션':'기록 없음';
+  if(!sessions.length){list.innerHTML='<div class="empty"><div class="empty-icon">♣</div>아직 기록된 세션이 없어.<br>첫 세션을 추가해봐!</div>';return}
+  list.innerHTML='';
+  [...sessions].reverse().forEach((s,ri)=>{
+    const i=sessions.length-1-ri,br=bankrollAt(i);
+    const rebuyInfo=(s.rebuyCount||s.reentryCount)?` · 리바이${s.rebuyCount||0}+리엔트리${s.reentryCount||0}`:'';
+    const locInfo=s.location?` · ${s.location}`:'';
+    const moodEmoji=['','😩','😔','😐','🙂','😄'][s.mood||3];
+    list.innerHTML+=`<div class="session-item">
+      <div class="session-dot ${s.type}">${s.type==='cash'?'♠':'🏆'}</div>
+      <div class="session-info">
+        <div class="session-stake">${s.stake||(s.type==='cash'?'캐시 게임':'토너먼트')}${locInfo}</div>
+        <div class="session-meta">${s.date||'—'}${s.hours?' · '+s.hours+'h':''}${rebuyInfo} ${moodEmoji}</div>
+        ${s.memo?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${s.memo}</div>`:''}
+      </div>
+      <div>
+        <div class="session-pnl ${s.pnl>=0?'pos':'neg'}">${s.pnl>=0?'+':''}$${Math.abs(s.pnl).toLocaleString()}</div>
+        <div class="session-br">$${br.toLocaleString()}</div>
+      </div>
+      <button class="del-btn" onclick="deleteSession(${i})">×</button>
+    </div>`;
+  });
+}
+
+// ── STATS ──
+function selectStatTab(t){
+  activeStatTab=t;
+  document.querySelectorAll('#statsSeg .seg-btn').forEach((b,i)=>b.classList.toggle('active',['overview','location','time','mental'][i]===t));
+  ['Overview','Location','Time','Mental'].forEach(n=>document.getElementById('stats'+n).style.display='none');
+  document.getElementById('stats'+t.charAt(0).toUpperCase()+t.slice(1)).style.display='block';
+}
+function renderStats(){
+  document.getElementById('statsSubtitle').textContent=sessions.length+'세션 · '+sessions.reduce((a,s)=>a+(s.hours||0),0).toFixed(1)+'시간';
+  renderStatsOverview();renderStatsLocation();renderStatsTime();renderStatsMental();
+}
+function renderStatsOverview(){
+  const br=currentBankroll(),pnl=br-INITIAL;
+  const wins=sessions.filter(s=>s.pnl>0).length,losses=sessions.filter(s=>s.pnl<0).length;
+  const totalH=sessions.reduce((a,s)=>a+(s.hours||0),0);
+  const best=sessions.length?Math.max(...sessions.map(s=>s.pnl)):0;
+  const worst=sessions.length?Math.min(...sessions.map(s=>s.pnl)):0;
+  const avg=sessions.length?Math.round(pnl/sessions.length):0;
+  const cashS=sessions.filter(s=>s.type==='cash'),tS=sessions.filter(s=>s.type==='tourney');
+  const cards=[
+    {label:'총 수익/손실',val:fmt(pnl),sub:((pnl/INITIAL)*100).toFixed(1)+'% ROI',cls:pnl>=0?'pos':'neg'},
+    {label:'승률',val:sessions.length?Math.round(wins/sessions.length*100)+'%':'—',sub:wins+'승 '+losses+'패',cls:sessions.length&&wins/sessions.length>=.5?'pos':'neg'},
+    {label:'시간당 수익',val:totalH>0?(pnl/totalH>=0?'+':'−')+'$'+Math.abs(Math.round(pnl/totalH)):'—',sub:totalH.toFixed(1)+'시간',cls:totalH>0&&pnl/totalH>=0?'pos':'neg'},
+    {label:'세션 평균',val:sessions.length?(avg>=0?'+':'−')+'$'+Math.abs(avg):'—',sub:sessions.length+'세션 기준',cls:avg>=0?'pos':'neg'},
+    {label:'최고 세션',val:sessions.length?'+$'+best.toLocaleString():'—',sub:'단일 최대 수익',cls:'pos'},
+    {label:'최악 세션',val:sessions.length?'−$'+Math.abs(worst).toLocaleString():'—',sub:'단일 최대 손실',cls:'neg'},
+    {label:'캐시 게임',val:cashS.length+'회',sub:fmt(cashS.reduce((a,s)=>a+s.pnl,0)),cls:cashS.reduce((a,s)=>a+s.pnl,0)>=0?'pos':'neg'},
+    {label:'토너먼트',val:tS.length+'회',sub:fmt(tS.reduce((a,s)=>a+s.pnl,0)),cls:tS.reduce((a,s)=>a+s.pnl,0)>=0?'pos':'neg'},
+  ];
+  document.getElementById('statsOverview').innerHTML=`<div class="stats-grid">${cards.map(c=>`<div class="stat-card"><div class="stat-card-label">${c.label}</div><div class="stat-card-value ${c.cls}">${c.val}</div><div class="stat-card-sub">${c.sub}</div></div>`).join('')}</div><div class="sec">최근 세션 결과</div><div class="streak-bar" id="streakBar">${[...sessions].slice(-20).reverse().map(s=>`<div class="streak-dot ${s.pnl>=0?'w':'l'}"></div>`).join('')}</div>`;
+}
+function renderStatsLocation(){
+  const locs={};
+  sessions.forEach(s=>{
+    const l=s.location||'미기록';
+    if(!locs[l])locs[l]={pnl:0,count:0,hours:0,wins:0};
+    locs[l].pnl+=s.pnl;locs[l].count++;locs[l].hours+=s.hours||0;if(s.pnl>0)locs[l].wins++;
+  });
+  const sorted=Object.entries(locs).sort((a,b)=>b[1].pnl-a[1].pnl);
+  if(!sorted.length){document.getElementById('statsLocation').innerHTML='<div class="empty"><div class="empty-icon">📍</div>장소 데이터 없음</div>';return}
+  document.getElementById('statsLocation').innerHTML=`<div class="loc-grid">${sorted.map(([name,d])=>{
+    const hr=d.hours>0?Math.round(d.pnl/d.hours):0;const wr=Math.round(d.wins/d.count*100);
+    return`<div class="loc-card"><div class="loc-name">📍 ${name}</div><div class="loc-stats">
+      <div class="loc-stat"><div class="loc-stat-label">수익</div><div class="loc-stat-value" style="color:${d.pnl>=0?'var(--green)':'var(--red)'}">${d.pnl>=0?'+':''}$${Math.abs(d.pnl).toLocaleString()}</div></div>
+      <div class="loc-stat"><div class="loc-stat-label">세션</div><div class="loc-stat-value">${d.count}</div></div>
+      <div class="loc-stat"><div class="loc-stat-label">시간당</div><div class="loc-stat-value" style="color:${hr>=0?'var(--green)':'var(--red)'}">${hr>=0?'+':''}$${Math.abs(hr)}</div></div>
+      <div class="loc-stat"><div class="loc-stat-label">승률</div><div class="loc-stat-value" style="color:${wr>=50?'var(--green)':'var(--red)'}">${wr}%</div></div>
+    </div></div>`}).join('')}</div>`;
+}
+function renderStatsTime(){
+  const days=['일','월','화','수','목','금','토'];
+  const dayData=Array(7).fill(0).map(()=>({pnl:0,count:0}));
+  const hourData=Array(24).fill(0).map(()=>({pnl:0,count:0}));
+  sessions.forEach(s=>{
+    if(s.date){const d=new Date(s.date);dayData[d.getDay()].pnl+=s.pnl;dayData[d.getDay()].count++}
+    if(s.startTime){const h=parseInt(s.startTime.split(':')[0]);hourData[h].pnl+=s.pnl;hourData[h].count++}
+  });
+  const maxDayAbs=Math.max(1,...dayData.map(d=>Math.abs(d.pnl)));
+  const activeHours=hourData.map((h,i)=>({...h,i})).filter(h=>h.count>0);
+  let html=`<div class="sec">요일별 수익</div>`;
+  dayData.forEach((d,i)=>{
+    const w=Math.min(100,Math.abs(d.pnl)/maxDayAbs*100);
+    const color=d.pnl>0?'var(--green)':d.pnl<0?'var(--red)':'var(--faint)';
+    html+=`<div class="heatmap-row"><div class="heatmap-label">${days[i]}</div>
+      <div class="heatmap-cell"><div style="width:${w}%;height:100%;background:${color};border-radius:4px;opacity:.75"></div></div>
+      <div style="font-size:11px;font-family:var(--mono);color:${color};min-width:60px;text-align:right">${d.count?fmt(d.pnl)+'('+d.count+')':'—'}</div>
+    </div>`;
+  });
+  if(activeHours.length){
+    const maxHA=Math.max(1,...activeHours.map(h=>Math.abs(h.pnl)));
+    html+=`<div class="sec" style="margin-top:18px">시간대별 수익</div>`;
+    activeHours.forEach(h=>{
+      const w=Math.min(100,Math.abs(h.pnl)/maxHA*100);
+      const color=h.pnl>0?'var(--green)':h.pnl<0?'var(--red)':'var(--faint)';
+      html+=`<div class="heatmap-row"><div class="heatmap-label">${String(h.i).padStart(2,'0')}시</div>
+        <div class="heatmap-cell"><div style="width:${w}%;height:100%;background:${color};border-radius:4px;opacity:.75"></div></div>
+        <div style="font-size:11px;font-family:var(--mono);color:${color};min-width:60px;text-align:right">${fmt(h.pnl)}</div>
+      </div>`;
+    });
+  }
+  document.getElementById('statsTime').innerHTML=html||'<div class="empty">데이터 없음</div>';
+}
+function renderStatsMental(){
+  const moodLabels={5:'😄 최고',4:'🙂 좋음',3:'😐 보통',2:'😔 나쁨',1:'😩 최악'};
+  const moodData={};
+  sessions.forEach(s=>{const m=s.mood||3;if(!moodData[m])moodData[m]={pnl:0,count:0,wins:0};moodData[m].pnl+=s.pnl;moodData[m].count++;if(s.pnl>0)moodData[m].wins++});
+  const sleepSessions=sessions.filter(s=>s.sleep>0);
+  let html=`<div class="sec">컨디션별 평균 수익</div><div class="stats-grid">`;
+  [5,4,3,2,1].forEach(m=>{const d=moodData[m];if(!d)return;const avg=Math.round(d.pnl/d.count);html+=`<div class="stat-card"><div class="stat-card-label">${moodLabels[m]}</div><div class="stat-card-value ${avg>=0?'pos':'neg'}">${avg>=0?'+':''}$${Math.abs(avg)}</div><div class="stat-card-sub">${d.count}세션 평균</div></div>`});
+  html+=`</div>`;
+  if(sleepSessions.length){
+    const avgSleep=sleepSessions.reduce((a,s)=>a+s.sleep,0)/sleepSessions.length;
+    const goodSleep=sleepSessions.filter(s=>s.sleep>=7);
+    const badSleep=sleepSessions.filter(s=>s.sleep<6);
+    const gAvg=goodSleep.length?Math.round(goodSleep.reduce((a,s)=>a+s.pnl,0)/goodSleep.length):null;
+    const bAvg=badSleep.length?Math.round(badSleep.reduce((a,s)=>a+s.pnl,0)/badSleep.length):null;
+    html+=`<div class="sec" style="margin-top:18px">수면과 성적</div><div class="stats-grid">
+      <div class="stat-card"><div class="stat-card-label">평균 수면</div><div class="stat-card-value">${avgSleep.toFixed(1)}h</div><div class="stat-card-sub">${sleepSessions.length}세션 기록</div></div>
+      ${gAvg!==null?`<div class="stat-card"><div class="stat-card-label">7h+ 수면 세션</div><div class="stat-card-value ${gAvg>=0?'pos':'neg'}">${gAvg>=0?'+':''}$${Math.abs(gAvg)}</div><div class="stat-card-sub">${goodSleep.length}세션 평균</div></div>`:''}
+      ${bAvg!==null?`<div class="stat-card"><div class="stat-card-label">6h 미만 세션</div><div class="stat-card-value ${bAvg>=0?'pos':'neg'}">${bAvg>=0?'+':''}$${Math.abs(bAvg)}</div><div class="stat-card-sub">${badSleep.length}세션 평균</div></div>`:''}
+    </div>`;
+  }
+  document.getElementById('statsMental').innerHTML=html||'<div class="empty">멘탈 데이터 없음</div>';
+}
+
+// ── TOOLS ──
+function selectToolTab(t){
+  activeToolTab=t;
+  document.querySelectorAll('#toolsSeg .seg-btn').forEach((b,i)=>b.classList.toggle('active',['hands','variance','export'][i]===t));
+  ['Hands','Variance','Export'].forEach(n=>document.getElementById('tools'+n).style.display='none');
+  document.getElementById('tools'+t.charAt(0).toUpperCase()+t.slice(1)).style.display='block';
+}
+function renderTools(){renderHandsTab();renderVarianceTab();renderExportTab()}
+
+function renderHandsTab(){
+  let html=`<div class="field"><label>핸드 제목</label><input type="text" id="hTitle" placeholder="예: AK vs 리레이즈">
+  </div><div class="field"><label>내용</label><textarea id="hBody" placeholder="상황, 내 액션, 배운 점..."></textarea></div>
+  <div class="field-row">
+    <div class="field"><label>태그</label><select id="hTag"><option value="bluff">블러프</option><option value="value">밸류</option><option value="fold">폴드 스팟</option><option value="bad">나쁜 플레이</option><option value="good">좋은 플레이</option></select></div>
+    <div class="field"><label>세션 날짜</label><input type="date" id="hDate"></div>
+  </div>
+  <button class="submit-btn" onclick="saveHand()">핸드 저장</button>
+  <div style="height:16px"></div>`;
+  if(!hands.length){html+='<div class="empty"><div class="empty-icon">🃏</div>저장된 핸드 없음</div>';document.getElementById('toolsHands').innerHTML=html;return}
+  const tagColors={bluff:'var(--red)',value:'var(--green)',fold:'var(--amber)',bad:'var(--red)',good:'var(--teal)'};
+  html+=hands.slice().reverse().map((h,ri)=>{
+    const i=hands.length-1-ri;
+    return`<div class="hand-item"><div class="hand-header"><div><span class="hand-tag" style="background:${tagColors[h.tag]||'var(--accent)'};color:#0a0a0f">${h.tag}</span><span class="hand-title">${h.title}</span></div><div style="display:flex;align-items:center;gap:8px"><span class="hand-meta">${h.date||''}</span><button onclick="deleteHand(${i})" style="background:none;border:none;color:var(--faint);cursor:pointer;font-size:14px">×</button></div></div><div class="hand-body">${h.body}</div></div>`
+  }).join('');
+  document.getElementById('toolsHands').innerHTML=html;
+  document.getElementById('hDate').value=new Date().toISOString().slice(0,10);
+}
+function saveHand(){
+  const title=document.getElementById('hTitle').value.trim();
+  const body=document.getElementById('hBody').value.trim();
+  if(!title){alert('핸드 제목을 입력해줘!');return}
+  hands.push({title,body,tag:document.getElementById('hTag').value,date:document.getElementById('hDate').value});
+  save();renderHandsTab();
+}
+function deleteHand(i){hands.splice(i,1);save();renderHandsTab()}
+
+function renderVarianceTab(){
+  const pnl=currentBankroll()-INITIAL;
+  const totalH=sessions.reduce((a,s)=>a+(s.hours||0),0);
+  const defWinRate=totalH>0?Math.round(pnl/totalH):0;
+  document.getElementById('toolsVariance').innerHTML=`
+  <div class="field"><label>예상 시간당 수익 ($/h)</label><input type="number" id="vWinRate" value="${defWinRate}" step="1"></div>
+  <div class="field"><label>시간당 표준편차 ($/h) — 통상 윈레이트의 15~20배</label><input type="number" id="vStd" value="${Math.abs(defWinRate)*18||200}" step="10"></div>
+  <div class="field"><label>시뮬레이션 시간</label><input type="number" id="vHours" value="200" step="10"></div>
+  <button class="submit-btn" onclick="runVariance()">시뮬레이션 실행</button>
+  <div id="varResult"></div>`;
+}
+function runVariance(){
+  const wr=parseFloat(document.getElementById('vWinRate').value)||0;
+  const std=parseFloat(document.getElementById('vStd').value)||200;
+  const hrs=parseFloat(document.getElementById('vHours').value)||200;
+  const br=currentBankroll();
+  const N=10000;let bust=0,profits=[];
+  for(let i=0;i<N;i++){
+    let b=br,busted=false;
+    for(let h=0;h<hrs;h++){b+=wr+std*(Math.sqrt(-2*Math.log(Math.random()))*Math.cos(2*Math.PI*Math.random()));if(b<=0){busted=true;break}}
+    if(busted)bust++;else profits.push(b-br);
+  }
+  profits.sort((a,b)=>a-b);
+  const p10=profits[Math.floor(profits.length*.1)]||0;
+  const p50=profits[Math.floor(profits.length*.5)]||0;
+  const p90=profits[Math.floor(profits.length*.9)]||0;
+  const bustRate=(bust/N*100).toFixed(1);
+  const expected=wr*hrs;
+  document.getElementById('varResult').innerHTML=`<div class="var-result">
+    <div class="var-stat-row"><span class="var-stat-label">기대 수익 (${hrs}h)</span><span class="var-stat-value" style="color:${expected>=0?'var(--green)':'var(--red)'}">${expected>=0?'+':''}$${Math.round(expected).toLocaleString()}</span></div>
+    <div class="var-stat-row"><span class="var-stat-label">하위 10% 시나리오</span><span class="var-stat-value" style="color:var(--red)">${p10>=0?'+':''}$${Math.round(p10).toLocaleString()}</span></div>
+    <div class="var-stat-row"><span class="var-stat-label">중앙값 (50%)</span><span class="var-stat-value" style="color:${p50>=0?'var(--green)':'var(--red)'}">${p50>=0?'+':''}$${Math.round(p50).toLocaleString()}</span></div>
+    <div class="var-stat-row"><span class="var-stat-label">상위 10% 시나리오</span><span class="var-stat-value" style="color:var(--green)">+$${Math.round(p90).toLocaleString()}</span></div>
+    <div class="var-stat-row"><span class="var-stat-label">뱅크롤 파산 확률</span><span class="var-stat-value" style="color:${+bustRate>10?'var(--red)':'var(--amber)'}">${bustRate}%</span></div>
+  </div>`;
+}
+
+function renderExportTab(){
+  document.getElementById('toolsExport').innerHTML=`
+  <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:13px;padding:16px;margin-bottom:12px">
+    <div style="font-size:14px;font-weight:500;margin-bottom:6px">📊 CSV 내보내기</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6">모든 세션 데이터를 엑셀에서 열 수 있는 CSV 파일로 다운로드해줘.</div>
+    <button class="submit-btn" onclick="exportCSV()">CSV 다운로드</button>
+  </div>
+  <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:13px;padding:16px">
+    <div style="font-size:14px;font-weight:500;margin-bottom:6px">🔄 데이터 백업</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6">전체 데이터를 JSON으로 저장하거나 백업 파일을 불러올 수 있어.</div>
+    <button class="submit-btn" onclick="exportJSON()" style="background:var(--surface2);color:var(--text);margin-bottom:8px">JSON 백업 저장</button>
+    <label style="display:block;width:100%;padding:12px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:10px;text-align:center;font-size:14px;cursor:pointer;color:var(--muted)">📂 백업 불러오기 <input type="file" accept=".json" onchange="importJSON(event)" style="display:none"></label>
+  </div>`;
+}
+function exportCSV(){
+  if(!sessions.length){alert('내보낼 세션이 없어!');return}
+  const header='날짜,타입,스테이크,장소,수익/손실,시간,리바이횟수,리바이금액,리엔트리횟수,리엔트리금액,컨디션,수면,메모\n';
+  const rows=sessions.map(s=>[s.date,s.type,s.stake||'',s.location||'',s.pnl,s.hours||0,s.rebuyCount||0,s.rebuyAmt||0,s.reentryCount||0,s.reentryAmt||0,s.mood||3,s.sleep||0,(s.memo||'').replace(/,/g,' ')].join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+header+rows],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='기정이_포커_세션_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+function exportJSON(){
+  const data=JSON.stringify({sessions,hands,exportDate:new Date().toISOString()},null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='기정이_포커_백업_'+new Date().toISOString().slice(0,10)+'.json';a.click();
+}
+function importJSON(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();r.onload=function(ev){try{const d=JSON.parse(ev.target.result);if(d.sessions){sessions=d.sessions;if(d.hands)hands=d.hands;save();alert('불러오기 완료! 세션 '+sessions.length+'개');renderHome();}else alert('올바른 백업 파일이 아닌 것 같아.')}catch(err){alert('파일 읽기 오류: '+err.message)}};r.readAsText(f);
+}
+
+// Init
+const todayStr=new Date().toISOString().slice(0,10);
+document.getElementById('fDate').value=todayStr;
+renderHome();
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script>
+</body>
+</html>
