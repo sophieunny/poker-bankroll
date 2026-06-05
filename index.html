@@ -190,6 +190,20 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--sans);height:
 .modal-close{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:2px 6px}
 .edit-btn{background:none;border:none;color:var(--accent);padding:3px 6px;cursor:pointer;font-size:13px;flex-shrink:0;margin-top:1px}
 
+/* Weekly goal history */
+.week-hist-item{background:var(--surface);border:0.5px solid var(--border2);border-radius:14px;padding:13px 15px;margin-bottom:10px}
+.week-hist-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.week-hist-label{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.week-hist-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+.week-hist-badge.win{background:var(--green-dim);color:var(--green)}
+.week-hist-badge.loss{background:var(--red-dim);color:var(--red)}
+.week-hist-badge.current{background:var(--accent-dim);color:var(--accent)}
+.week-hist-row{display:flex;justify-content:space-between;align-items:baseline}
+.week-hist-pnl{font-family:var(--mono);font-size:20px;font-weight:500}
+.week-hist-detail{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.week-hist-bar-bg{width:100%;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-top:8px}
+.week-hist-bar-fill{height:100%;border-radius:3px;transition:width .4s}
+
 select option{background:#1c1c26}
 input[type=range]{accent-color:var(--accent)}
 </style>
@@ -202,6 +216,7 @@ input[type=range]{accent-color:var(--accent)}
     <button class="tab" data-page="add" onclick="switchTab('add')"><i class="ti ti-plus"></i>기록</button>
     <button class="tab" data-page="history" onclick="switchTab('history')"><i class="ti ti-list"></i>히스토리</button>
     <button class="tab" data-page="stats" onclick="switchTab('stats')"><i class="ti ti-chart-bar"></i>통계</button>
+    <button class="tab" data-page="expense" onclick="switchTab('expense')"><i class="ti ti-wallet"></i>지출</button>
     <button class="tab" data-page="tools" onclick="switchTab('tools')"><i class="ti ti-tool"></i>도구</button>
   </div>
   <div id="pages">
@@ -339,6 +354,29 @@ input[type=range]{accent-color:var(--accent)}
       <div id="statsMental" style="display:none"></div>
     </div>
 
+    <!-- EXPENSE -->
+    <div class="page" id="page-expense">
+      <div class="page-header"><h1>지출 관리</h1><p id="expenseSubtitle">뱅크롤 차감 항목</p></div>
+      <div class="field">
+        <label>카테고리</label>
+        <select id="fExpCat">
+          <option value="식비">🍔 식비</option>
+          <option value="교통">🚗 교통</option>
+          <option value="숙박">🏨 숙박</option>
+          <option value="기타">📦 기타</option>
+        </select>
+      </div>
+      <div class="field"><label>항목 설명</label><input type="text" id="fExpDesc" placeholder="예: 밥, 주차비, 호텔..."></div>
+      <div class="field-row">
+        <div class="field"><label>금액 ($)</label><input type="number" id="fExpAmt" placeholder="0" step="1" min="0"></div>
+        <div class="field"><label>날짜</label><input type="date" id="fExpDate"></div>
+      </div>
+      <button class="submit-btn" onclick="addExpense()">지출 추가</button>
+      <div style="height:16px"></div>
+      <div id="expenseSummary"></div>
+      <div id="expenseList"></div>
+    </div>
+
     <!-- TOOLS -->
     <div class="page" id="page-tools">
       <div class="page-header"><h1>도구</h1><p>핸드 메모 · 분산 · 내보내기</p></div>
@@ -435,15 +473,17 @@ input[type=range]{accent-color:var(--accent)}
 const INITIAL=6000,STOP_TOTAL=.20,STOP_SESS=.05;
 let sessions=JSON.parse(localStorage.getItem('gj_poker')||'[]');
 let hands=JSON.parse(localStorage.getItem('gj_hands')||'[]');
+let expenses=JSON.parse(localStorage.getItem('gj_expenses')||'[]');
 let weeklyGoal=parseInt(localStorage.getItem('gj_goal')||'1500');
 let selectedType='cash',selectedMood=5;
 let chartInst=null,liveStart=null,liveTick=null;
 let activeStatTab='overview',activeToolTab='hands';
 
 function save(){localStorage.setItem('gj_poker',JSON.stringify(sessions));localStorage.setItem('gj_hands',JSON.stringify(hands))}
+function saveExpenses(){localStorage.setItem('gj_expenses',JSON.stringify(expenses))}
 function saveGoal(){localStorage.setItem('gj_goal',weeklyGoal)}
 function bankrollAt(idx){let b=INITIAL;for(let i=0;i<=idx;i++)b+=sessions[i].pnl;return b}
-function currentBankroll(){return sessions.reduce((a,s)=>a+s.pnl,INITIAL)}
+function currentBankroll(){return sessions.reduce((a,s)=>a+s.pnl,INITIAL)-expenses.reduce((a,e)=>a+e.amt,0)}
 function fmt(n){return(n>=0?'+$':'-$')+Math.abs(n).toLocaleString()}
 function fmtAbs(n){return'$'+Math.abs(n).toLocaleString()}
 
@@ -465,6 +505,7 @@ function switchTab(page){
   if(page==='home')renderHome();
   if(page==='history')renderHistory();
   if(page==='stats')renderStats();
+  if(page==='expense')renderExpense();
   if(page==='tools')renderTools();
 }
 
@@ -625,7 +666,10 @@ function renderWeeklyGoal(){
   <div class="goal-card">
     <div class="goal-header">
       <div class="goal-title">주간 목표</div>
-      <button class="goal-edit-btn" onclick="toggleGoalEdit()">목표 변경</button>
+      <div style="display:flex;gap:6px">
+        <button class="goal-edit-btn" onclick="toggleWeekHistory()" style="background:var(--surface2)">📅 기록</button>
+        <button class="goal-edit-btn" onclick="toggleGoalEdit()">목표 변경</button>
+      </div>
     </div>
     <div class="goal-amounts">
       <div class="goal-current" style="color:${color}">${earned>=0?'+':''}$${Math.abs(earned).toLocaleString()}</div>
@@ -640,7 +684,66 @@ function renderWeeklyGoal(){
       <input type="number" id="goalInput" value="${weeklyGoal}" step="100" min="100" placeholder="목표 금액">
       <button class="goal-save-btn" onclick="updateGoal()">저장</button>
     </div>
-  </div>`;
+  </div>
+  <div id="weekHistArea" style="display:none"></div>`;
+}
+function toggleWeekHistory(){
+  const el=document.getElementById('weekHistArea');
+  if(!el)return;
+  if(el.style.display==='none'){renderWeeklyHistory();el.style.display='block';}
+  else el.style.display='none';
+}
+function getWeekStart(date){
+  // Returns Monday of that week
+  const d=new Date(date);
+  const day=d.getDay();
+  d.setDate(d.getDate()-(day===0?6:day-1));
+  d.setHours(0,0,0,0);
+  return d;
+}
+function renderWeeklyHistory(){
+  const el=document.getElementById('weekHistArea');
+  if(!el)return;
+  if(!sessions.length){el.innerHTML='<div class="empty" style="padding:12px 0">세션 없음</div>';return}
+  // Group sessions by week
+  const weekMap={};
+  sessions.forEach(s=>{
+    if(!s.date)return;
+    const parts=s.date.split('-');
+    const d=new Date(+parts[0],+parts[1]-1,+parts[2]);
+    const mon=getWeekStart(d);
+    const key=mon.toISOString().slice(0,10);
+    if(!weekMap[key])weekMap[key]={monday:mon,pnl:0,sessions:0,wins:0};
+    weekMap[key].pnl+=s.pnl;
+    weekMap[key].sessions++;
+    if(s.pnl>0)weekMap[key].wins++;
+  });
+  // Current week key
+  const nowMon=getWeekStart(new Date()).toISOString().slice(0,10);
+  const sorted=Object.entries(weekMap).sort((a,b)=>b[0].localeCompare(a[0]));
+  let html='<div class="sec" style="margin-top:4px">주간 목표 히스토리</div>';
+  sorted.forEach(([key,w])=>{
+    const isCurrent=key===nowMon;
+    const hit=w.pnl>=weeklyGoal;
+    const pct=Math.min(100,Math.max(0,Math.round(w.pnl/weeklyGoal*100)));
+    const color=hit?'var(--green)':w.pnl>0?'var(--accent)':'var(--red)';
+    const barColor=hit?'var(--green)':w.pnl>=weeklyGoal*0.5?'var(--accent)':'var(--amber)';
+    const sun=new Date(w.monday);sun.setDate(sun.getDate()+6);
+    const label=`${w.monday.getMonth()+1}/${w.monday.getDate()} ~ ${sun.getMonth()+1}/${sun.getDate()}`;
+    const badge=isCurrent?'<span class="week-hist-badge current">이번 주</span>':hit?'<span class="week-hist-badge win">✓ 달성</span>':'<span class="week-hist-badge loss">✗ 미달성</span>';
+    html+=`<div class="week-hist-item">
+      <div class="week-hist-header">
+        <div class="week-hist-label">${label}</div>
+        ${badge}
+      </div>
+      <div class="week-hist-row">
+        <div class="week-hist-pnl" style="color:${color}">${w.pnl>=0?'+':''}$${Math.abs(w.pnl).toLocaleString()}</div>
+        <div class="week-hist-detail">${pct}% · ${w.sessions}세션 · ${w.wins}승</div>
+      </div>
+      <div class="week-hist-bar-bg"><div class="week-hist-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
+    </div>`;
+  });
+  el.innerHTML=html;
 }
 function toggleGoalEdit(){
   const w=document.getElementById('goalEditWrap');
@@ -764,13 +867,26 @@ function renderStatsLocation(){
 function renderStatsTime(){
   const days=['일','월','화','수','목','금','토'];
   const dayData=Array(7).fill(0).map(()=>({pnl:0,count:0}));
-  const hourData=Array(24).fill(0).map(()=>({pnl:0,count:0}));
+  // Time buckets: 새벽(2-6), 오전(6-11), 점심(11-15), 오후(15-19), 밤(19-26=7-2)
+  const buckets=[
+    {label:'🌙 새벽',desc:'2시~6시',pnl:0,count:0},
+    {label:'🌅 오전',desc:'6시~11시',pnl:0,count:0},
+    {label:'☀️ 점심',desc:'11시~15시',pnl:0,count:0},
+    {label:'🌇 오후',desc:'15시~19시',pnl:0,count:0},
+    {label:'🌃 밤',desc:'19시~2시',pnl:0,count:0},
+  ];
+  function getBucket(h){
+    if(h>=2&&h<6)return 0;   // 새벽
+    if(h>=6&&h<11)return 1;  // 오전
+    if(h>=11&&h<15)return 2; // 점심
+    if(h>=15&&h<19)return 3; // 오후
+    return 4;                 // 밤 (19~24, 0~2)
+  }
   sessions.forEach(s=>{
     if(s.date){const parts=s.date.split('-');const d=new Date(+parts[0],+parts[1]-1,+parts[2]);dayData[d.getDay()].pnl+=s.pnl;dayData[d.getDay()].count++}
-    if(s.startTime){const h=parseInt(s.startTime.split(':')[0]);hourData[h].pnl+=s.pnl;hourData[h].count++}
+    if(s.startTime){const h=parseInt(s.startTime.split(':')[0]);const b=getBucket(h);buckets[b].pnl+=s.pnl;buckets[b].count++}
   });
   const maxDayAbs=Math.max(1,...dayData.map(d=>Math.abs(d.pnl)));
-  const activeHours=hourData.map((h,i)=>({...h,i})).filter(h=>h.count>0);
   let html=`<div class="sec">요일별 수익</div>`;
   dayData.forEach((d,i)=>{
     const w=Math.min(100,Math.abs(d.pnl)/maxDayAbs*100);
@@ -780,15 +896,18 @@ function renderStatsTime(){
       <div style="font-size:11px;font-family:var(--mono);color:${color};min-width:60px;text-align:right">${d.count?fmt(d.pnl)+'('+d.count+')':'—'}</div>
     </div>`;
   });
-  if(activeHours.length){
-    const maxHA=Math.max(1,...activeHours.map(h=>Math.abs(h.pnl)));
+  const activeBuckets=buckets.filter(b=>b.count>0);
+  if(activeBuckets.length){
+    const maxBA=Math.max(1,...activeBuckets.map(b=>Math.abs(b.pnl)));
     html+=`<div class="sec" style="margin-top:18px">시간대별 수익</div>`;
-    activeHours.forEach(h=>{
-      const w=Math.min(100,Math.abs(h.pnl)/maxHA*100);
-      const color=h.pnl>0?'var(--green)':h.pnl<0?'var(--red)':'var(--faint)';
-      html+=`<div class="heatmap-row"><div class="heatmap-label">${String(h.i).padStart(2,'0')}시</div>
+    buckets.forEach(b=>{
+      if(!b.count)return;
+      const w=Math.min(100,Math.abs(b.pnl)/maxBA*100);
+      const color=b.pnl>0?'var(--green)':b.pnl<0?'var(--red)':'var(--faint)';
+      html+=`<div class="heatmap-row">
+        <div class="heatmap-label" style="min-width:52px;font-size:11px">${b.label}</div>
         <div class="heatmap-cell"><div style="width:${w}%;height:100%;background:${color};border-radius:4px;opacity:.75"></div></div>
-        <div style="font-size:11px;font-family:var(--mono);color:${color};min-width:60px;text-align:right">${fmt(h.pnl)}</div>
+        <div style="font-size:11px;font-family:var(--mono);color:${color};min-width:70px;text-align:right">${fmt(b.pnl)} (${b.count})</div>
       </div>`;
     });
   }
@@ -947,13 +1066,13 @@ function exportCSV(){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='기정이_포커_세션_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
 function exportJSON(){
-  const data=JSON.stringify({sessions,hands,exportDate:new Date().toISOString()},null,2);
+  const data=JSON.stringify({sessions,hands,expenses,exportDate:new Date().toISOString()},null,2);
   const blob=new Blob([data],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='기정이_포커_백업_'+new Date().toISOString().slice(0,10)+'.json';a.click();
 }
 function importJSON(e){
   const f=e.target.files[0];if(!f)return;
-  const r=new FileReader();r.onload=function(ev){try{const d=JSON.parse(ev.target.result);if(d.sessions){sessions=d.sessions;if(d.hands)hands=d.hands;save();alert('불러오기 완료! 세션 '+sessions.length+'개');renderHome();}else alert('올바른 백업 파일이 아닌 것 같아.')}catch(err){alert('파일 읽기 오류: '+err.message)}};r.readAsText(f);
+  const r=new FileReader();r.onload=function(ev){try{const d=JSON.parse(ev.target.result);if(d.sessions){sessions=d.sessions;if(d.hands)hands=d.hands;if(d.expenses){expenses=d.expenses;saveExpenses()}save();alert('불러오기 완료! 세션 '+sessions.length+'개');renderHome();}else alert('올바른 백업 파일이 아닌 것 같아.')}catch(err){alert('파일 읽기 오류: '+err.message)}};r.readAsText(f);
 }
 
 // ── EDIT SESSION ──
@@ -1016,9 +1135,70 @@ function saveEdit(){
   renderHome();
 }
 
+// ── EXPENSE ──
+const expCatIcon={식비:'🍔',교통:'🚗',숙박:'🏨',기타:'📦'};
+function renderExpense(){
+  const totalExp=expenses.reduce((a,e)=>a+e.amt,0);
+  const weekExp=expenses.filter(e=>{
+    if(!e.date)return false;
+    const now=new Date();const day=now.getDay();
+    const monday=new Date(now);monday.setDate(now.getDate()-(day===0?6:day-1));monday.setHours(0,0,0,0);
+    const parts=e.date.split('-');const d=new Date(+parts[0],+parts[1]-1,+parts[2]);
+    return d>=monday;
+  }).reduce((a,e)=>a+e.amt,0);
+  document.getElementById('expenseSubtitle').textContent=expenses.length?`총 ${expenses.length}건 · $${totalExp.toLocaleString()} 차감`:'지출 없음';
+  // Summary cards
+  const catTotals={};
+  expenses.forEach(e=>{catTotals[e.cat]=(catTotals[e.cat]||0)+e.amt});
+  let sumHtml=`<div class="stats-grid" style="margin-bottom:14px">
+    <div class="stat-card"><div class="stat-card-label">총 지출</div><div class="stat-card-value neg">-$${totalExp.toLocaleString()}</div><div class="stat-card-sub">${expenses.length}건</div></div>
+    <div class="stat-card"><div class="stat-card-label">이번 주</div><div class="stat-card-value neg">-$${weekExp.toLocaleString()}</div><div class="stat-card-sub">월~오늘</div></div>
+  </div>`;
+  document.getElementById('expenseSummary').innerHTML=sumHtml;
+  // List
+  if(!expenses.length){document.getElementById('expenseList').innerHTML='<div class="empty"><div class="empty-icon">💸</div>아직 지출 없음</div>';return}
+  let html='<div class="sec">지출 내역</div>';
+  [...expenses].reverse().forEach((e,ri)=>{
+    const i=expenses.length-1-ri;
+    html+=`<div class="session-item">
+      <div class="session-dot" style="background:var(--red-dim);color:var(--red);font-size:16px">${expCatIcon[e.cat]||'📦'}</div>
+      <div class="session-info">
+        <div class="session-stake">${e.desc||e.cat}</div>
+        <div class="session-meta">${e.date||'—'} · ${e.cat}</div>
+      </div>
+      <div>
+        <div class="session-pnl neg">-$${e.amt.toLocaleString()}</div>
+      </div>
+      <button class="del-btn" onclick="deleteExpense(${i})">×</button>
+    </div>`;
+  });
+  document.getElementById('expenseList').innerHTML=html;
+}
+function addExpense(){
+  const amt=parseFloat(document.getElementById('fExpAmt').value);
+  if(!amt||amt<=0){alert('금액을 입력해줘!');return}
+  const desc=document.getElementById('fExpDesc').value.trim();
+  const cat=document.getElementById('fExpCat').value;
+  const date=document.getElementById('fExpDate').value||new Date().toISOString().slice(0,10);
+  expenses.push({amt,desc,cat,date});
+  saveExpenses();
+  document.getElementById('fExpAmt').value='';
+  document.getElementById('fExpDesc').value='';
+  renderExpense();
+  renderHome();
+}
+function deleteExpense(i){
+  if(!confirm('지출 삭제할까?'))return;
+  expenses.splice(i,1);
+  saveExpenses();
+  renderExpense();
+  renderHome();
+}
+
 // Init
 const todayStr=new Date().toISOString().slice(0,10);
 document.getElementById('fDate').value=todayStr;
+document.getElementById('fExpDate').value=todayStr;
 renderHome();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script>
